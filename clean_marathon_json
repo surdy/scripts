@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+command -v jq >/dev/null 2>&1 || { echo >&2 "jq is not installed. Please install jq (https://stedolan.github.io/jq/) to continue"; exit 1; }
+
+input=""
+fields_to_delete="version versionInfo tasksStaged tasksRunning tasksHealthy tasksUnhealthy deployments tasks lastTaskFailure"
+
+if [ $# -ge 1 ]; then
+    if [ -f "$1" ]; then
+        input="$1"  
+    else
+        echo "$1: File does not exist"
+        exit
+    fi
+else
+    input="-"
+fi
+
+json_text=$(cat "$input")
+
+strip_fields_command=""
+for field in $fields_to_delete; do
+    strip_fields_command+="jq 'del(..|.$field?)' | "
+done
+strip_fields_command="${strip_fields_command/%| /}"
+
+echo "$json_text" | eval $strip_fields_command
