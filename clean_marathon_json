@@ -3,7 +3,7 @@
 command -v jq >/dev/null 2>&1 || { echo >&2 "jq is not installed. Please install jq (https://stedolan.github.io/jq/) to continue"; exit 1; }
 
 input=""
-fields_to_delete="version versionInfo tasksStaged tasksRunning tasksHealthy tasksUnhealthy deployments tasks lastTaskFailure"
+fields_to_delete="version versionInfo tasksStaged tasksRunning tasksHealthy tasksUnhealthy deployments tasks lastTaskFailure uris"
 
 if [ $# -ge 1 ]; then
     if [ -f "$1" ]; then
