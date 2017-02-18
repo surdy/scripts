@@ -1,0 +1,6 @@
+[Unit]
+Description=Service to rotate through live wallpapers for screen lock
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/rotate-kscreenlock-video

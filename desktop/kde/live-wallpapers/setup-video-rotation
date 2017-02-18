@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+
+# Script to set up periodic rotation of kscreenlock video wallpaper
+# CAUTION: This script runs some commands as sudo
+
+user=$(id -un)
+
+# Check if video screenlock plugin is installed
+#if [ ! -d /home/$user/.local/share/plasma/wallpapers/org.kde.video ]
+# this checks for non-empty dir 
+if find "/home/$user/.local/share/plasma/wallpapers/org.kde.video" -mindepth 1 -print -quit | grep -q .
+then
+    echo "ERROR: org.kde.video plugin not found"
+    echo "Install the plugin using $SCRIPT_DIR/install-plugin"
+    exit
+fi
+
+# Check if the plugin is already configured to be used
+if grep -q '\[Greeter\]\[Wallpaper\]\[org.kde.video\]\[General\]' /home/$user/.config/kscreenlockerrc
+then
+    echo "ERROR : Plugin org.kde.video not yet configured to be used for rotation"
+    echo "Goto Screen Locking settings and configure to use the plugin"
+    exit
+fi
+
+# Check if video wallpaper files exist
+find /usr/share/wallpapers/live-wallpapers/*/day -mindepth 1 -print -quit | grep -q .
+day_rtn_code=$?
+find /usr/share/wallpapers/live-wallpapers/*/night -mindepth 1 -print -quit | grep -q .
+night_rtn_code=$?
+if [[ $night_rtn_code -ne 0 || $day_rtn_code -ne 0 ]]
+then
+    echo "ERROR: Live wallpapers needed for day/night rotation not avialable"
+    echo "Run $SCRIPT_DIR/get-apple-live-wallpapers to fetch the wallpapers"
+    exit
+fi
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+sudo cp $SCRIPT_DIR/rotate-kscreenlock-video /usr/local/bin/
+sudo cp -r "$SCRIPT_DIR/systemd/*" /etc/system/systemd/
+
+sudo systemctl start rotate-kscreenlock-video.timer
+sudo systemctl enable rotate-kscreenlock-video.timer

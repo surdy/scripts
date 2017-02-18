@@ -1,0 +1,15 @@
+#!/usr/bin/env bash 
+
+SOURCE_FILE_URL=http://a1.phobos.apple.com/us/r1000/000/Features/atv/AutumnResources/videos/entries.json
+LIVE_WALLPAPER_DIR=/usr/share/wallpapers/live-wallpapers
+
+
+mkdir -p "$LIVE_WALLPAPER_DIR"
+wget -P "$LIVE_WALLPAPER_DIR" "$SOURCE_FILE_URL"
+
+while read  url time_of_day location
+do
+    video_dir="${LIVE_WALLPAPER_DIR}/${location}/${time_of_day}"
+    mkdir -p "$video_dir"
+    wget -P "$video_dir" $url 
+done < <( jq -r '.[].assets[]| .url + " " + .timeOfDay + " " + .accessibilityLabel' "$LIVE_WALLPAPER_DIR/$(basename $SOURCE_FILE_URL)")

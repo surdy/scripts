@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+# Setup a plugin to use video screenlock
+# Original idea from https://forum.kde.org/viewtopic.php?f=289&t=131783
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cp -r "$SCRIPT_DIR/org.kde.video" ~/.local/share/plasma/wallpapers/

@@ -1,0 +1,12 @@
+[Unit]
+Description=Runs rotate-kscreenlock-video.service every 30 mins
+
+[Timer]
+# Time to wait after booting before we run first time
+OnBootSec=10min
+# Time between running each consecutive time
+OnUnitActiveSec=30min
+Unit=rotate-kscreenlock-video.service
+
+[Install]
+WantedBy=multi-user.target
