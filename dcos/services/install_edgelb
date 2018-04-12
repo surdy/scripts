@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+
+set -o errexit
+set -o nounset
+
+source ~/.bashrc_mesosphere
+
+if [[ $# -eq 0 ]]; then
+    echo "USAGE: install_edgelb <version>"
+    exit 1
+else
+    version="${1}"
+fi 
+
+elb_repo_url=$(get_edgelb_repo_url $version)
+elb_pool_repo_url=$(get_edgelb_pool_repo_url $version)
+
+dcos package repo add --index=0 edgelb-aws ${elb_repo_url}
+dcos package repo add --index=0 edgelb-pool-aws ${elb_pool_repo_url}
+
+rm -f edge-lb-private-key.pem edge-lb-public-key.pem
+dcos security org service-accounts keypair edge-lb-private-key.pem edge-lb-public-key.pem
+
+dcos security org service-accounts create -p edge-lb-public-key.pem -d "Edge-LB service account" edge-lb-principal
+
+dcos security secrets create-sa-secret --strict edge-lb-private-key.pem edge-lb-principal dcos-edgelb/edge-lb-secret
+
+dcos security org groups add_user superusers edge-lb-principal
+
+#dcos security org users grant edge-lb-principal dcos:adminrouter:service:marathon full
+#dcos security org users grant edge-lb-principal dcos:adminrouter:package full
+#dcos security org users grant edge-lb-principal dcos:adminrouter:service:edgelb full
+#dcos security org users grant edge-lb-principal dcos:service:marathon:marathon:services:/dcos-edgelb full
+#dcos security org users grant edge-lb-principal dcos:mesos:master:endpoint:path:/api/v1 full
+#dcos security org users grant edge-lb-principal dcos:mesos:master:endpoint:path:/api/v1/scheduler full
+#dcos security org users grant edge-lb-principal dcos:mesos:master:framework:principal:edge-lb-principal full
+#dcos security org users grant edge-lb-principal dcos:mesos:master:framework:role full
+#dcos security org users grant edge-lb-principal dcos:mesos:master:reservation:principal:edge-lb-principal full
+#dcos security org users grant edge-lb-principal dcos:mesos:master:reservation:role full
+#dcos security org users grant edge-lb-principal dcos:mesos:master:volume:principal:edge-lb-principal full
+#dcos security org users grant edge-lb-principal dcos:mesos:master:volume:role full
+#dcos security org users grant edge-lb-principal dcos:mesos:master:task:user:root full
+#dcos security org users grant edge-lb-principal dcos:mesos:master:task:app_id full
+
+#dcos security org users grant edge-lb-principal dcos:adminrouter:service:dcos-edgelb/pools/<POOL-NAME> full
+
+cat > edge-lb-options.json  <<"EOF"
+{
+  "service": {
+    "secretName": "dcos-edgelb/edge-lb-secret",
+    "principal": "edge-lb-principal",
+    "mesosProtocol": "https"
+  }
+}
+EOF
+
+dcos package install --yes --options=edge-lb-options.json edgelb
+
+until dcos edgelb ping; do sleep 1; done
