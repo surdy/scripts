@@ -1,0 +1,3 @@
+#!/usr/bin/env bash 
+
+dcos node --json | jq -r '.[] | select( .attributes.public_ip == "true") | .hostname'
