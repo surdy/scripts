@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+
+# when "dcos edgelb delete <pool_name>" is unable to remove the pool and you want to force remove it
+
+set -o errexit
+set -o nounset
+
+if [[ $# -eq 0 ]]; then
+    echo "USAGE: destroy_edgelb_pool <pool-name>"
+    exit 1
+else
+    pool_name="${1}"
+fi 
+
+if dcos edgelb list | grep -sw "$pool_name"; then
+    echo ""
+    echo "Deleting pool from Edgelb state"
+    dcos edgelb delete "$pool_name"
+fi 
+
+if dcos marathon app list --quiet | grep -sw "/dcos-edgelb/pools/${pool_name}"; then
+    echo ""
+    echo "Deleting marathon app for pool"
+    dcos marathon app remove "/dcos-edgelb/pools/${pool_name}"
+fi
+
+service_id=$(dcos service --inactive | grep "dcos-edgelb/pools/${pool_name}" | awk '{print $NF}') 
+if [[ -n "$service_id" ]]; then
+    echo ""
+    echo "Tearing down the framework for the pool"
+    dcos service shutdown "$service_id"
+fi
+
+echo "On a cluster node run : "
+echo "docker run mesosphere/janitor /janitor.py -r dcos-edgelb__pools__${pool_name}-role -p edge-lb-principal -z dcos-service-dcos-edgelb__pools__${pool_name}"
