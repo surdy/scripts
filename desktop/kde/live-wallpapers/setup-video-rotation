@@ -8,10 +8,10 @@ user=$(id -un)
 # Check if video screenlock plugin is installed
 #if [ ! -d /home/$user/.local/share/plasma/wallpapers/org.kde.video ]
 # this checks for non-empty dir 
-if find "/home/$user/.local/share/plasma/wallpapers/org.kde.video" -mindepth 1 -print -quit | grep -q .
+if ! find "/home/$user/.local/share/plasma/wallpapers/org.kde.video" -mindepth 1 -print -quit | grep -q .
 then
     echo "ERROR: org.kde.video plugin not found"
-    echo "Install the plugin using $SCRIPT_DIR/install-plugin"
+    echo "Install the plugin using ${SCRIPT_DIR}/install-plugin"
     exit
 fi
 
@@ -31,13 +31,14 @@ night_rtn_code=$?
 if [[ $night_rtn_code -ne 0 || $day_rtn_code -ne 0 ]]
 then
     echo "ERROR: Live wallpapers needed for day/night rotation not avialable"
-    echo "Run $SCRIPT_DIR/get-apple-live-wallpapers to fetch the wallpapers"
+    echo "Run ${SCRIPT_DIR}/get-apple-live-wallpapers to fetch the wallpapers"
     exit
 fi
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-sudo cp $SCRIPT_DIR/rotate-kscreenlock-video /usr/local/bin/
-sudo cp -r "$SCRIPT_DIR/systemd/*" /etc/system/systemd/
+sudo cp "${SCRIPT_DIR}/rotate-kscreenlock-video" /usr/local/bin/
+sudo cp "${SCRIPT_DIR}/systemd/*" /etc/systemd/system/
 
-sudo systemctl start rotate-kscreenlock-video.timer
-sudo systemctl enable rotate-kscreenlock-video.timer
+sudo systemctl daemon-reload
+
+sudo systemctl enable --now rotate-kscreenlock-video.timer
