@@ -2,7 +2,7 @@
 
 # Script to set up periodic rotation of kscreenlock video wallpaper
 # CAUTION: This script runs some commands as sudo
-
+set -x
 user=$(id -un)
 
 # Check if video screenlock plugin is installed
@@ -37,7 +37,7 @@ fi
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 sudo cp "${SCRIPT_DIR}/rotate-kscreenlock-video" /usr/local/bin/
-sudo cp "${SCRIPT_DIR}/systemd/*" /etc/systemd/system/
+sudo cp "${SCRIPT_DIR}/systemd/"* /etc/systemd/system/
 
 sudo systemctl daemon-reload
 
