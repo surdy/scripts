@@ -2,7 +2,7 @@
 
 # Script to set up periodic rotation of kscreenlock video wallpaper
 # CAUTION: This script runs some commands as sudo
-set -x
+
 user=$(id -un)
 
 # Check if video screenlock plugin is installed
