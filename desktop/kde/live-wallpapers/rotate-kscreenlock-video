@@ -1,7 +1,7 @@
 #!/usr/bin/env bash 
 
 LIVE_WALLPAPER_DIR=/usr/share/wallpapers/live-wallpapers
-SCREENLOCK_CONFIG=/home/harpreet/.config/kscreenlockerrc
+CURRENT_WALLPAPER_SYMLINK=/usr/share/wallpapers/live-wallpapers/kscreenlocker-background
 FIRST_MORN_HR=4
 LAST_MORN_HR=16
 
@@ -15,42 +15,26 @@ else
 fi
 
 # Checking if current wallpaper is correct for the time of the day
-if ! grep "^Video=.*/$time_of_day/" "$SCREENLOCK_CONFIG" > /dev/null
+current_wallpaper=$(readlink $CURRENT_WALLPAPER_SYMLINK)
+if ! [[ $current_wallpaper =~ /$time_of_day/ ]]
 then
     # Looks like we need to change wallpaper
     wallpaper_files=()
     while  read -d $'\0' -r file ; do
          wallpaper_files=("${wallpaper_files[@]}" "$file")
     done < <(find $LIVE_WALLPAPER_DIR/*/$time_of_day -name '*.mov' -print0)
-    #printf '%s\n' "${wallpaper_files[@]}"
     num_files=${#wallpaper_files[*]}
 
     # Picking on at random
     let random_file_index=$RANDOM%$num_files
     new_wallpaper_file=${wallpaper_files[$random_file_index]}
-    new_wallpaper_dir=$(dirname "$new_wallpaper_file")
-
-    # Escape file path  for sed operation
-    new_wallpaper_file="${new_wallpaper_file//\//\\/}"
-    new_wallpaper_dir="${new_wallpaper_dir//\//\\/}"
-
-    # Backup config file 
-    cp "$SCREENLOCK_CONFIG" "$SCREENLOCK_CONFIG".bak 
 
     # Set new wallpaper
-    sed -i "s/Video=.*/Video=${new_wallpaper_file}/g" $SCREENLOCK_CONFIG
-    if [ $? -ne 0 ]
+    ln -sf "$new_wallpaper_file" "$CURRENT_WALLPAPER_SYMLINK"
+    if [[ $? -eq 0 ]]
     then
-        cp "$SCREENLOCK_CONFIG".bak "$SCREENLOCK_CONFIG"
-        echo "Failed writing Video to config $SCREENLOCK_CONFIG" 
-        exit
+        echo "Rotated the screen lock to $new_wallpaper_file"
+    else
+        echo "Failed to rotate wallpaper"
     fi
-    sed -i "s/Folder=.*/Folder=${new_wallpaper_dir}/g" $SCREENLOCK_CONFIG
-    if [ $? -ne 0 ]
-    then
-        cp "$SCREENLOCK_CONFIG".bak "$SCREENLOCK_CONFIG"
-        echo "Failed writing Folder to config $SCREENLOCK_CONFIG" 
-        exit
-    fi
-    echo "Rotated the screen lock to $new_wallpaper_file"
 fi

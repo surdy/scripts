@@ -5,23 +5,28 @@
 
 user=$(id -un)
 
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )" 
+
+
 # Check if video screenlock plugin is installed
 #if [ ! -d /home/$user/.local/share/plasma/wallpapers/org.kde.video ]
 # this checks for non-empty dir 
-if ! find "/home/$user/.local/share/plasma/wallpapers/org.kde.video" -mindepth 1 -print -quit | grep -q .
+if ! find "/home/$user/.local/share/plasma/wallpapers/org.kde.video" -mindepth 1 -print -quit 2>/dev/null | grep -q .
 then
-    echo "ERROR: org.kde.video plugin not found"
-    echo "Install the plugin using ${SCRIPT_DIR}/install-plugin"
-    exit
+    $SCRIPT_DIR/install-plugin
 fi
 
-# Check if the plugin is already configured to be used
-if grep -q '\[Greeter\]\[Wallpaper\]\[org.kde.video\]\[General\]' /home/$user/.config/kscreenlockerrc
-then
-    echo "ERROR : Plugin org.kde.video not yet configured to be used for rotation"
-    echo "Goto Screen Locking settings and configure to use the plugin"
-    exit
-fi
+cat << 'EOF' > /home/$user/.config/kscreenlockerrc
+[$Version]
+update_info=kscreenlocker.upd:0.1-autolock
+
+[Greeter]
+Theme=com.github.varlesh.arc-dark
+WallpaperPlugin=org.kde.video
+
+[Greeter][Wallpaper][org.kde.video][General]
+Video=/usr/share/wallpapers/live-wallpapers/kscreenlocker-background
+EOF
 
 # Check if video wallpaper files exist
 find /usr/share/wallpapers/live-wallpapers/*/day -mindepth 1 -print -quit | grep -q .
@@ -41,4 +46,5 @@ sudo cp "${SCRIPT_DIR}/systemd/"* /etc/systemd/system/
 
 sudo systemctl daemon-reload
 
-sudo systemctl enable --now rotate-kscreenlock-video.timer
+sudo systemctl start rotate-kscreenlock-video.service
+sudo systemctl enable rotate-kscreenlock-video.timer
