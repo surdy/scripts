@@ -1,0 +1,30 @@
+#/usr/bin/env bash
+
+what="${1:-all}"
+
+uninstall_plugin()
+{
+    rm -rf ~/.local/share/plasma/wallpapers/org.kde.video
+    rm -f ~/.config/kscreenlockerrc
+}
+
+uninstall_units()
+{
+    sudo rm -f /etc/systemd/system/rotate-kscreenlock-video.timer
+    sudo rm -f /etc/systemd/system/rotate-kscreenlock-video.service
+    sudo systemctl daemon-reload 
+}
+
+uninstall_videos()
+{
+   sudo rm -rf /usr/share/wallpapers/live-wallpapers   
+}
+
+uninstall_all()
+{
+    uninstall_units
+    uninstall_plugin
+    #uninstall_videos
+}
+
+uninstall_${what}
