@@ -1,0 +1,17 @@
+dcos:mesos:master:framework:role:{{service_role}} create
+dcos:mesos:master:task:user:root create
+dcos:mesos:agent:task:user:root create
+dcos:mesos:master:reservation:role:{{service_role}} create
+dcos:mesos:master:reservation:principal:{{service_account}} delete
+dcos:mesos:master:volume:role:{{service_role}} create
+dcos:mesos:master:volume:principal:{{service_account}} delete
+dcos:secrets:default:/{{service_name}}/* full
+dcos:secrets:list:default:/{{service_name}} read
+dcos:adminrouter:ops:ca:rw full
+dcos:adminrouter:ops:ca:ro full
+dcos:mesos:master:framework:role:slave_public/{{service_role}} create
+dcos:mesos:master:framework:role:slave_public/{{service_role}} read
+dcos:mesos:master:reservation:role:slave_public/{{service_role}} create
+dcos:mesos:master:volume:role:slave_public/{{service_role}} create
+dcos:mesos:master:framework:role:slave_public read
+dcos:mesos:agent:framework:role:slave_public read

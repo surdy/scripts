@@ -1,0 +1,4 @@
+dcos:mesos:master:task:user:nobody create
+dcos:mesos:master:reservation:role:{{service_role}} create
+dcos:mesos:master:reservation:principal:{{service_account}} delete
+dcos:mesos:master:framework:role:{{service_role}} create
