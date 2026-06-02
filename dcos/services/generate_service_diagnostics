@@ -1,0 +1,165 @@
+#!/usr/bin/env bash
+
+set -o errexit
+set -o nounset
+#set -x 
+
+# Get diagnostics information for SDK services
+# Service task logs           DONE
+# Service plan status         DONE
+# Service configs             DONE
+# Framework task logs         DONE
+# Handle dead scheduler       DONE 
+# Marathon JSON for scheduler DONE
+
+all_services=( $(dcos service --inactive --json | jq -r .[].name) )
+auth_token="$(dcos config show core.dcos_acs_token)"
+dcos_url="$(dcos config show core.dcos_url)"
+run_id="$(date +%Y%m%d%k%M%S)"
+scheduler_running="true"
+
+function print_services()
+{
+    local service
+    for service in "${all_services[@]}"
+    do
+        echo "$service"
+    done
+}
+
+function contains_element 
+{
+    local e match="$1"
+    shift
+    for e; do [[ "$e" == "$match" ]] && return 0; done
+    return 1
+}
+
+function print_and_exit
+{
+    local message="${1}"
+    local function="${2}"
+    echo "$message"
+    if [ -n "$function" ]
+    then
+        $function
+    fi
+    exit 1
+}
+
+function get_task_logs
+{
+    local task_id="${1}"	
+    if [[ -z "${task_id// }" ]]
+    then
+	return
+    fi
+    local task_log_dir="${run_id}/task_logs/${task_id}"
+    mkdir -p "$task_log_dir"
+    echo "Getting task logs for $task_id"
+    #local executor_log_files=( $(dcos task ls --all --long $task_id | awk '{print $NF}' | grep 'stderr\|stdout' | grep -v logrotate) )
+    # Cannot use task ls as it would list executor sandbox files instead of nested container files
+    # Using static list for now
+    for log_file in {stdout,stderr}{,.1,.2,.3,.4,.5,.6,.7,.8,.9}
+    do
+        set +e
+        dcos task log --all --lines 10000 "$task_id" "$log_file" > "${task_log_dir}/${log_file}" 2 > /dev/null
+        set -e
+    done
+}
+
+function get_plan_statuses
+{
+    local service_name="${1}"
+    local plans_dir="${run_id}/plans"
+    mkdir -p "$plans_dir"
+    echo "Getting current service plan"
+    curl -k -s -f -m 30 -H "Authorization: token=$auth_token" ${dcos_url}/service/${service_name}/v1/plan > ${plans_dir}/current 2>&1 || return
+    local plans=( $( curl -k -s -f -m 30 -H "Authorization: token=$auth_token"  ${dcos_url}/service/${service_name}/v1/plans | jq -r .[]) )
+    for plan in "${plans[@]}"
+    do
+	set +e
+	echo "Getting $plan plan status"
+        curl -k -s -f -m 30 -H "Authorization: token=$auth_token"  ${dcos_url}/service/${service_name}/v1/plans/${plan} > "${plans_dir}/${plan}" 2>&1
+	set -e
+    done
+}
+
+function get_configurations
+{
+    local service_name="${1}"
+    local configs_dir="${run_id}/configs"
+    mkdir -p "$configs_dir"
+    local configs=( $(curl -k -s -f -m 30 -H "Authorization: token=$auth_token" ${dcos_url}/service/${service_name}/v1/configurations | jq -r .[]) ) 
+    for config in "${configs[@]}"
+    do
+	set +e
+	echo "Getting config $config"
+        curl -k -s -f -m 30 -H "Authorization: token=$auth_token"  ${dcos_url}/service/${service_name}/v1/configurations/${config} > "${configs_dir}/${config}" 2>&1
+	set -e
+    done
+}
+
+function get_pod_logs
+{
+    local service_name="${1}"
+    local pods=()
+    local pod_task_ids=()
+
+    # If the scheduler is running get pod list from API, else just get running tasks for the framework
+    if [ "$scheduler_running" == "true" ]
+    then
+        pod_task_ids=( $(curl -k -s -f -m 30 -H "Authorization: token=$auth_token" ${dcos_url}/service/${service_name}/v1/pod/status  | jq -r '.pods[].instances[].tasks[] | select(.status != "FINISHED" and .id != "" )| .id ') )
+    else
+	    # Scheduler is not running, so lets just get running tasks for the framework by framework name
+	    pod_task_ids=( $(dcos service --json --inactive | jq -r --arg SERVICE_NAME "$service_name" '.[] | select(.name == $SERVICE_NAME)| .tasks[].id') ) 
+    fi
+    for task_id in "${pod_task_ids[@]}"
+    do
+        get_task_logs "$task_id"
+    done
+}
+
+function get_marathon_json
+{
+    local service_name="${1}"
+    local json_filename="${service_name/\//}"
+    json_filename="${json_filename//\//-}.json"
+    echo "Getting Marathon app JSON for $service_name"
+    dcos marathon app show "$service_name" > "${run_id}/${json_filename}"
+}
+
+# Check is a service name is specified, if not then list all known services and exit
+if [[ $# -eq 0 ]]; then
+    echo "USAGE: generate_service_diagnostics <service name>"
+    echo ""
+    print_and_exit  "Currently registered services on the cluster are:" "print_services"
+else
+    # Service name is specified
+    service_name="${1}"
+
+    # Validate that the service is a known service on the cluster. If not exit with a list of known ones.
+    contains_element "$service_name" "${all_services[@]}" \
+	|| print_and_exit "$service_name not found in the cluster. Recognized services are: " "print_services"
+
+    # SKIPPED Get marathon app id for the service
+    #service_app_id="$(dcos marathon app list --json | jq -r --arg SERVICE_NAME "$service_name" '.[] | select(.labels.DCOS_SERVICE_NAME == $SERVICE_NAME)| .id ')"
+
+    # Get mesos task id for the service based on the marathon app id found above 
+    service_task_id="$(dcos task --json | jq -r --arg SERVICE_NAME "$service_name" '.[] | select(.labels[] | .key == "DCOS_SERVICE_NAME" and .value == $SERVICE_NAME) | .id')"
+    echo "Collecting diagnostics in the directory ${PWD}/${run_id}"
+    if [ -z "$service_task_id" ]
+    then
+	scheduler_running="false"
+        service_task_id="$(dcos task --completed --json | jq -r --arg SERVICE_NAME "$service_name" '.[] | select(.labels[] | .key == "DCOS_SERVICE_NAME" and .value == $SERVICE_NAME) | .id' | tail -n1)"
+    fi
+    get_task_logs "$service_task_id"
+    if [ "$scheduler_running" == "true" ]
+    then
+        get_plan_statuses "$service_name"
+        get_configurations "$service_name"
+    fi
+    get_pod_logs "$service_name"
+    get_marathon_json "$service_name"
+
+fi 
